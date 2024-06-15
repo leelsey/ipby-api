@@ -1,0 +1,35 @@
+[package]
+name = "ipby-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+serde_json = "1.0"
+axum = { version = "0.7", optional = true }
+tracing = { version = "0.1", optional = true }
+tracing-subscriber = { version = "0.3", optional = true }
+clap = { version = "4.5", features = ["derive"], optional = true }
+lambda_http = { version = "0.11", optional = true }
+lambda_runtime = { version = "0.11", optional = true }
+
+[features]
+default = []
+ipby-server = ["axum", "tracing", "tracing-subscriber", "clap"]
+aws-lambda = ["lambda_http"]
+aws-api = ["lambda_runtime"]
+
+[[bin]]
+name = "ipby-server"
+path = "src/server.rs"
+required-features = ["ipby-server"]
+
+[[bin]]
+name = "aws-lambda"
+path = "src/aws_lambda.rs"
+required-features = ["aws-lambda"]
+
+[[bin]]
+name = "aws-api"
+path = "src/aws_api.rs"
+required-features = ["aws-api"]
