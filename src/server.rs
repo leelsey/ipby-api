@@ -3,8 +3,8 @@ use axum::{
     body::Body,
     extract::{Path, Query},
     http::HeaderMap,
-    routing::get,
-    Router,
+    routing::{get, Router},
+    serve,
 };
 use clap::Parser;
 use serde_json::Value;
@@ -41,20 +41,29 @@ async fn main() {
 "#,
         version
     );
-    let args = Args::parse();
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
     info!("Starting server");
+    let args = Args::parse();
+    let app = Router::new()
+        .route("/", get(handle_root_request))
+        .route("/*path", get(handle_request));
     let bind_address = format!("{}:{}", args.ip, args.port);
-    info!("Running server on {}", bind_address);
-    let app = Router::new().route("/*path", get(handle_request));
     let listener = tokio::net::TcpListener::bind(&bind_address).await.unwrap();
-    axum::serve(listener, app)
+    info!("Running server on {}", bind_address);
+    serve(listener, app)
         .with_graceful_shutdown(handle_shutdown())
         .await
         .unwrap();
+}
+
+async fn handle_root_request(
+    headers: HeaderMap,
+    Query(params_query): Query<HashMap<String, String>>,
+) -> Response<Body> {
+    handle_request(Path(String::new()), headers, Query(params_query)).await
 }
 
 async fn handle_request(
@@ -62,7 +71,7 @@ async fn handle_request(
     headers: HeaderMap,
     Query(params_query): Query<HashMap<String, String>>,
 ) -> Response<Body> {
-    let trusted_proxies = vec![""]; // e.g. "127.0.0.1", "10.10.10.10"
+    let trusted_proxies = vec!["127.0.0.1", "10.0.0.1", "192.168.0.1"]; // e.g. "172.16.0.1", "172.31.255.254"
     let x_forwarded_for = headers
         .get("x-forwarded-for")
         .and_then(|v: &axum::http::HeaderValue| v.to_str().ok())
@@ -74,7 +83,11 @@ async fn handle_request(
     let client_ip = get_ip(x_forwarded_for, source_ip, &trusted_proxies);
     info!("Received request from {} ({})", client_ip, x_forwarded_for);
     const FORMATS: &[&str] = &["json", "jsonp", "xml", "yaml", "toml"];
-    let path_segments: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+    let path_segments: Vec<&str> = path
+        .trim_start_matches('/')
+        .trim_end_matches('/')
+        .split('/')
+        .collect();
     let (format, sub_path) = match path_segments.as_slice() {
         [] => (Some(""), Some("")),
         [format] => (Some(*format), Some("")),
