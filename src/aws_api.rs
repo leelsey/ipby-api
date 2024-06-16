@@ -39,7 +39,7 @@ async fn func(event: LambdaEvent<Value>) -> Result<Value, Error> {
         .get("headers")
         .and_then(|h| h.as_object())
         .unwrap_or(&map_null);
-    let trusted_proxies = vec![""]; // e.g. "127.0.0.1", "10.10.10.10"
+    let trusted_proxies = vec!["127.0.0.1", "10.0.0.1", "192.168.0.1"]; // e.g. "172.16.0.1", "172.31.255.254"
     let x_forwarded_for = headers
         .get("x-forwarded-for")
         .and_then(|v| v.as_str())
